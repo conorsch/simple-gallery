@@ -1,0 +1,3 @@
+[build]
+# use musl for statically linked binaries
+target = "x86_64-unknown-linux-musl"

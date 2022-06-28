@@ -1,0 +1,54 @@
+<html>
+<head>
+<title>{{ config.title }}</title>
+
+<style>
+
+body {
+  width: 100%;
+  height: 100%;
+  background-color: #222222;
+  display: block;
+  overflow: hidden;
+}
+.jawn img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 1;
+  visibility: hidden;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  <-- Each image should display for ~{{ config.duration_per_image }}s -->
+  animation: fade {{ config.duration_total }}s infinite;
+  -webkit-animation: fade {{ config.duration_total }}s infinite;
+}
+
+@keyframes fade {
+{% for kf in keyframes %}
+    {{ kf.0 }}% {
+        opacity: {{ kf.1 }};
+        visibility: visible;
+    }
+{% endfor %}
+}
+
+{% for i in config.imgs %}
+{% set n_imgs = config.imgs|length %}
+#f{{ loop.index }} {
+    animation-delay: {{ config.animation_delay * (n_imgs - loop.index) }}s;
+}
+{% endfor %}
+</style>
+</head>
+
+<body>
+<div class="jawn fade">
+{% for i in config.imgs | reverse %}
+    <img id="f{{ loop.index }}" src="{{ i }}">
+{% endfor %}
+</div>
+</body>
+</html>
