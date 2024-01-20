@@ -6,6 +6,7 @@ use clap::Parser;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use tower_http::services::ServeDir;
+use tower_http::services::ServeFile;
 
 
 #[macro_use]
@@ -76,9 +77,15 @@ async fn main() {
         let c = TransitionConfig::new(imgs, args.title);
         let html = Html(c.generate_html());
 
+        let r = get_random_image(&image_dir, &args.file_extension);
+        warn!("rando image is: {}", r);
+        // Router::new().route_service("/foo", ServeFile::new("assets/index.html"))
         let app = Router::new()
             .nest_service("/img", ServeDir::new(&image_dir))
-            .route("/", get(move || async { html }));
+            .route_service("/random", ServeFile::new(r))
+            .route_service("/static", ServeFile::new("img/prato.jpg"))
+            .route("/", get(move || async { html }))
+            .route("/hello", get(move || async { "what's up, dawg?" }));
         let bind_socket = format!("{}:{}", bind_address, serve_port);
         debug!("Starting webserver, binding to {}", bind_socket);
         let listener = tokio::net::TcpListener::bind(bind_socket).await.unwrap();
@@ -88,6 +95,8 @@ async fn main() {
     }
 }
 
+/// Walk filesystem directory and return a list of all files matching file extension.
+/// Optionally can be shuffled for random order.
 fn find_images(image_dir: &str, file_extension: &str, shuffle: bool) -> Vec<String> {
     let mut img_files: Vec<String> = Vec::new();
     for ent in WalkDir::new(image_dir).into_iter().flatten() {
@@ -102,4 +111,9 @@ fn find_images(image_dir: &str, file_extension: &str, shuffle: bool) -> Vec<Stri
     }
 
     img_files
+}
+
+fn get_random_image(image_dir: &str, file_extension: &str) -> String {
+    let imgs = find_images(image_dir, file_extension, true);
+    imgs[0].to_string()
 }
