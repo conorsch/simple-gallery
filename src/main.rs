@@ -1,11 +1,11 @@
 use walkdir::WalkDir;
-mod lib;
-use crate::lib::TransitionConfig;
+use simple_gallery::TransitionConfig;
 use axum::{response::Html, routing::get, Router};
-use axum_extra::routing::SpaRouter;
+// use axum_extra::routing::SpaRouter;
 use clap::Parser;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use tower_http::services::ServeDir;
 
 
 #[macro_use]
@@ -39,6 +39,10 @@ struct Args {
     /// Randomize order of images
     #[clap(short, long, value_parser, default_value_t = true)]
     shuffle: bool,
+
+    /// File extension of images, used to filter results.
+    #[clap(short, long, default_value = "png")]
+    file_extension: String,
 }
 
 #[tokio::main]
@@ -51,7 +55,7 @@ async fn main() {
     if args.generate {
         let image_dir = args.directory;
         debug!("Generating HTML, finding images in {}", image_dir);
-        let imgs = find_images(&image_dir, args.shuffle);
+        let imgs = find_images(&image_dir, &args.file_extension, args.shuffle);
         let c = TransitionConfig::new(imgs, args.title);
         let html = c.generate_html();
         println!("{}", html);
@@ -64,28 +68,31 @@ async fn main() {
         let serve_port = args.port;
         let bind_address = args.bind_address;
         // Create a single-page application (SPA) router for serving static images.
-        let spa = SpaRouter::new("/img", &image_dir);
-        let imgs = find_images(&image_dir, args.shuffle);
+        // let spa = SpaRouter::new("/img", &image_dir);
+        let imgs = find_images(&image_dir, &args.file_extension, args.shuffle);
+        if imgs.is_empty() {
+            warn!("image directory is empty");
+        }
         let c = TransitionConfig::new(imgs, args.title);
         let html = Html(c.generate_html());
 
         let app = Router::new()
-            .merge(spa)
+            .nest_service("/img", ServeDir::new(&image_dir))
             .route("/", get(move || async { html }));
         let bind_socket = format!("{}:{}", bind_address, serve_port);
         debug!("Starting webserver, binding to {}", bind_socket);
-        axum::Server::bind(&bind_socket.parse().unwrap())
-            .serve(app.into_make_service())
+        let listener = tokio::net::TcpListener::bind(bind_socket).await.unwrap();
+        axum::serve(listener, app.into_make_service())
             .await
             .unwrap();
     }
 }
 
-fn find_images(image_dir: &str, shuffle: bool) -> Vec<String> {
+fn find_images(image_dir: &str, file_extension: &str, shuffle: bool) -> Vec<String> {
     let mut img_files: Vec<String> = Vec::new();
     for ent in WalkDir::new(image_dir).into_iter().flatten() {
         let path = ent.path();
-        if path.display().to_string().ends_with(".png") {
+        if path.display().to_string().ends_with(format!(".{}", file_extension).as_str()) {
             img_files.push(path.display().to_string());
         }
     }
