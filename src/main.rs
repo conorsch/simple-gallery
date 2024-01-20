@@ -1,12 +1,9 @@
-use walkdir::WalkDir;
-use simple_gallery::TransitionConfig;
-use axum::{response::Html, routing::get, Router};
-// use axum_extra::routing::SpaRouter;
+use axum::{routing::get, Router};
 use clap::Parser;
-use rand::seq::SliceRandom;
-use rand::thread_rng;
+use simple_gallery::ImageDir;
+use simple_gallery::TransitionConfig;
 use tower_http::services::ServeDir;
-
+use tower_http::services::ServeFile;
 
 #[macro_use]
 extern crate log;
@@ -51,13 +48,17 @@ async fn main() {
     let env = Env::default().filter_or("RUST_LOG", "debug,hyper=info");
     env_logger::init_from_env(env);
 
+    let i = ImageDir {
+        path: args.directory.parse().unwrap(),
+        file_extension: args.file_extension,
+    };
+    let imgs = i.find_images();
+    let c = TransitionConfig::new(imgs, args.title);
+    let html = c.generate_html();
+
     // Dump HTML and exit
     if args.generate {
-        let image_dir = args.directory;
-        debug!("Generating HTML, finding images in {}", image_dir);
-        let imgs = find_images(&image_dir, &args.file_extension, args.shuffle);
-        let c = TransitionConfig::new(imgs, args.title);
-        let html = c.generate_html();
+        debug!("Generating HTML, finding images in {}", &args.directory);
         println!("{}", html);
 
     // Otherwise, spin up webserver
@@ -67,18 +68,14 @@ async fn main() {
         let image_dir = args.directory;
         let serve_port = args.port;
         let bind_address = args.bind_address;
-        // Create a single-page application (SPA) router for serving static images.
-        // let spa = SpaRouter::new("/img", &image_dir);
-        let imgs = find_images(&image_dir, &args.file_extension, args.shuffle);
-        if imgs.is_empty() {
-            warn!("image directory is empty");
-        }
-        let c = TransitionConfig::new(imgs, args.title);
-        let html = Html(c.generate_html());
 
         let app = Router::new()
+            // Homepage, auto slideshow from generated html
+            .route("/", get(move || async { html }))
+            // Static file server, so images can be loaded from directory
             .nest_service("/img", ServeDir::new(&image_dir))
-            .route("/", get(move || async { html }));
+            // Direct file loading of a random image from the directory
+            .route_service("/random", RandomFileServer::new(i));
         let bind_socket = format!("{}:{}", bind_address, serve_port);
         debug!("Starting webserver, binding to {}", bind_socket);
         let listener = tokio::net::TcpListener::bind(bind_socket).await.unwrap();
@@ -88,18 +85,37 @@ async fn main() {
     }
 }
 
-fn find_images(image_dir: &str, file_extension: &str, shuffle: bool) -> Vec<String> {
-    let mut img_files: Vec<String> = Vec::new();
-    for ent in WalkDir::new(image_dir).into_iter().flatten() {
-        let path = ent.path();
-        if path.display().to_string().ends_with(format!(".{}", file_extension).as_str()) {
-            img_files.push(path.display().to_string());
-        }
+#[derive(Clone)]
+pub struct RandomFileServer(ImageDir);
+
+impl RandomFileServer {
+    pub fn new(image_dir: ImageDir) -> Self {
+        Self(image_dir)
     }
-    if shuffle {
-        let mut rng = thread_rng();
-        img_files.shuffle(&mut rng);
+}
+
+use http::Request;
+use std::task::{Context, Poll};
+use tower_service::Service;
+impl<ReqBody> Service<Request<ReqBody>> for RandomFileServer
+where
+    ReqBody: Send + 'static,
+{
+    type Error = <ServeDir as Service<Request<ReqBody>>>::Error;
+    type Response = <ServeDir as Service<Request<ReqBody>>>::Response;
+    type Future = <ServeDir as Service<Request<ReqBody>>>::Future;
+
+    #[inline]
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
-    img_files
+    #[inline]
+    fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
+        // let r = get_random_image("img", "jpg");
+        let r = self.0.get_random_image();
+        debug!("looked up fresh random image {} (in call)", r);
+        let mut file_server = ServeFile::new(r);
+        file_server.call(req)
+    }
 }

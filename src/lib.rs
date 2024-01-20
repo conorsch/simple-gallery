@@ -1,6 +1,46 @@
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use serde::Serialize;
+use std::path::PathBuf;
+use walkdir::WalkDir;
 
-/// Store all 
+/// Local directory on-disk where images are stored.
+#[derive(Clone)]
+pub struct ImageDir {
+    /// The filepath of the image directory.
+    pub path: PathBuf,
+    /// The file extension of image files, for filtering directory contents.
+    pub file_extension: String,
+}
+
+impl ImageDir {
+    /// Walk filesystem directory and return a list of all files matching file extension.
+    pub fn find_images(&self) -> Vec<String> {
+        let mut img_files: Vec<String> = Vec::new();
+        for ent in WalkDir::new(self.path.as_os_str()).into_iter().flatten() {
+            let path = ent.path();
+            if path
+                .display()
+                .to_string()
+                .ends_with(format!(".{}", self.file_extension).as_str())
+            {
+                img_files.push(path.display().to_string());
+            }
+        }
+        img_files
+    }
+
+    /// Return a single image filepath, as string, at random from the direcotry.
+    pub fn get_random_image(&self) -> String {
+        let mut imgs = self.find_images();
+        let mut rng = thread_rng();
+        imgs.shuffle(&mut rng);
+        imgs[0].to_string()
+    }
+}
+
+/// Represents the CSS declarations for fade-in/fade-out transitions
+/// between images in the slideshow.
 #[derive(Serialize)]
 pub struct TransitionConfig {
     pub imgs: Vec<String>,
@@ -89,5 +129,14 @@ mod tests {
             assert!(k <= 100);
             assert!(v == 0 || v == 1);
         }
+    }
+
+    #[test]
+    fn create_image_dir() {
+        let d = String::from("img");
+        let i = ImageDir {
+            path: d.into(),
+            file_extension: String::from("png"),
+        };
     }
 }

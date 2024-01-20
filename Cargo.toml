@@ -24,3 +24,7 @@ env_logger = "~0.9"
 log = "0.4.17"
 rand = "0.8.5"
 tower-http = { version = "0.5.1", features = ["fs"] }
+mime = "0.3.17"
+tower-service = "0.3.2"
+http = "1.0.0"
+tower = "0.4.13"

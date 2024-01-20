@@ -1316,12 +1316,16 @@ dependencies = [
  "axum-extra",
  "clap",
  "env_logger",
+ "http 1.0.0",
  "log",
+ "mime",
  "rand",
  "serde",
  "tera",
  "tokio",
+ "tower",
  "tower-http 0.5.1",
+ "tower-service",
  "walkdir",
 ]
 
