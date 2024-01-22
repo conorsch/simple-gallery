@@ -1,4 +1,4 @@
-use axum::{routing::get, Router};
+use axum::{response::Html, routing::get, Router};
 use clap::Parser;
 use simple_gallery::ImageDir;
 use simple_gallery::TransitionConfig;
@@ -64,7 +64,7 @@ async fn main() {
         // without an application restart.
         let app = Router::new()
             // Homepage, auto slideshow from generated html
-            .route("/", get(move || async { html }))
+            .route("/", get(move || async { Html(html) }))
             // Static file server, so images can be loaded from directory
             .nest_service("/img", ServeDir::new(&args.directory))
             // Direct file loading of a random image from the directory
