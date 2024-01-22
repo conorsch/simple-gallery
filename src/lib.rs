@@ -98,15 +98,13 @@ impl TransitionConfig {
 
     /// Emit full in-line HTML for application. The img-src attributes are the only
     /// external resources loaded.
-    pub fn generate_html(&self) -> String {
+    pub fn generate_html(&self) -> anyhow::Result<String> {
         // Load the Tera/Jinja template.
         let html_template = include_str!("../files/index.html.j2");
         let mut context = tera::Context::new();
         context.insert("config", &self);
         context.insert("keyframes", &self.keyframes());
-
-        let result = tera::Tera::one_off(html_template, &context, false);
-        result.unwrap()
+        Ok(tera::Tera::one_off(html_template, &context, false)?)
     }
 }
 

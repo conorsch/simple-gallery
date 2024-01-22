@@ -40,18 +40,18 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let env = Env::default().filter_or("RUST_LOG", "debug,hyper=info");
     env_logger::init_from_env(env);
 
     let i = ImageDir {
-        path: args.directory.parse().unwrap(),
+        path: args.directory.parse()?,
         file_extension: args.file_extension,
     };
     let imgs = i.find_images();
     let c = TransitionConfig::new(imgs, args.title);
-    let html = c.generate_html();
+    let html = c.generate_html()?;
 
     // Dump HTML and exit
     if args.generate {
@@ -70,13 +70,10 @@ async fn main() {
             // Direct file loading of a random image from the directory
             .route_service("/random", RandomFileServer::new(i));
         debug!("Starting webserver, binding to {}", args.bind_address);
-        let listener = tokio::net::TcpListener::bind(args.bind_address)
-            .await
-            .unwrap();
-        axum::serve(listener, app.into_make_service())
-            .await
-            .unwrap();
+        let listener = tokio::net::TcpListener::bind(args.bind_address).await?;
+        axum::serve(listener, app.into_make_service()).await?;
     }
+    Ok(())
 }
 
 #[derive(Clone)]
