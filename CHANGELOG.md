@@ -1,5 +1,8 @@
 # simple-gallery changelog
 
+## 0.0.3 (unreleased)
+* fix: --bind-address now takes a socketaddr
+
 ## 0.0.2
 * feat: add /random route
 * feat: add --file-extension flag

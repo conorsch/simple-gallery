@@ -2,6 +2,7 @@ use axum::{routing::get, Router};
 use clap::Parser;
 use simple_gallery::ImageDir;
 use simple_gallery::TransitionConfig;
+use std::net::SocketAddr;
 use tower_http::services::ServeDir;
 use tower_http::services::ServeFile;
 
@@ -17,13 +18,9 @@ struct Args {
     #[clap(short, long, value_parser, default_value = "img")]
     directory: String,
 
-    /// TCP port to listen on
-    #[clap(short, long, value_parser, default_value_t = 3000)]
-    port: u16,
-
-    /// Local IP address to bind to
-    #[clap(short, long, value_parser, default_value = "127.0.0.1")]
-    bind_address: String,
+    /// Local TCP socket to bind to.
+    #[clap(short, long, value_parser, default_value = "127.0.0.1:3000")]
+    bind_address: SocketAddr,
 
     /// Title for HTML page, e.g. "example.com"
     #[clap(short, long, value_parser, default_value = "simple-gallery")]
@@ -65,20 +62,17 @@ async fn main() {
     } else {
         // TODO: Reread the directory periodically, so we can find new files
         // without an application restart.
-        let image_dir = args.directory;
-        let serve_port = args.port;
-        let bind_address = args.bind_address;
-
         let app = Router::new()
             // Homepage, auto slideshow from generated html
             .route("/", get(move || async { html }))
             // Static file server, so images can be loaded from directory
-            .nest_service("/img", ServeDir::new(&image_dir))
+            .nest_service("/img", ServeDir::new(&args.directory))
             // Direct file loading of a random image from the directory
             .route_service("/random", RandomFileServer::new(i));
-        let bind_socket = format!("{}:{}", bind_address, serve_port);
-        debug!("Starting webserver, binding to {}", bind_socket);
-        let listener = tokio::net::TcpListener::bind(bind_socket).await.unwrap();
+        debug!("Starting webserver, binding to {}", args.bind_address);
+        let listener = tokio::net::TcpListener::bind(args.bind_address)
+            .await
+            .unwrap();
         axum::serve(listener, app.into_make_service())
             .await
             .unwrap();
