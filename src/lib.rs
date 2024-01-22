@@ -15,8 +15,8 @@ pub struct ImageDir {
 
 impl ImageDir {
     /// Walk filesystem directory and return a list of all files matching file extension.
-    pub fn find_images(&self) -> Vec<String> {
-        let mut img_files: Vec<String> = Vec::new();
+    pub fn find_images(&self) -> Vec<PathBuf> {
+        let mut img_files: Vec<PathBuf> = Vec::new();
         for ent in WalkDir::new(self.path.as_os_str()).into_iter().flatten() {
             let path = ent.path();
             if path
@@ -24,18 +24,18 @@ impl ImageDir {
                 .to_string()
                 .ends_with(format!(".{}", self.file_extension).as_str())
             {
-                img_files.push(path.display().to_string());
+                img_files.push(path.to_path_buf());
             }
         }
         img_files
     }
 
     /// Return a single image filepath, as string, at random from the direcotry.
-    pub fn get_random_image(&self) -> String {
+    pub fn get_random_image(&self) -> PathBuf {
         let mut imgs = self.find_images();
         let mut rng = thread_rng();
         imgs.shuffle(&mut rng);
-        imgs[0].to_string()
+        imgs[0].clone()
     }
 }
 
@@ -43,18 +43,21 @@ impl ImageDir {
 /// between images in the slideshow.
 #[derive(Serialize)]
 pub struct TransitionConfig {
-    pub imgs: Vec<String>,
+    pub imgs: Vec<PathBuf>,
     pub title: String,
     pub n_imgs: f32,
     pub duration_per_image: f32,
     pub transition_time: f32,
     pub animation_delay: f32,
     pub duration_total: f32,
+
+    /// The subroute at which the images will be served, e.g. "static/"
+    pub static_route: String,
 }
 
 impl TransitionConfig {
     /// From a list of images, generator all the animation values for CSS.
-    pub fn new(imgs: Vec<String>, title: String) -> TransitionConfig {
+    pub fn new(imgs: Vec<PathBuf>, title: String) -> TransitionConfig {
         // Via https://www.devtwins.com/blog/css-cross-fading-images
         // Define durations in seconds. We use floats so we can do math,
         // and will recast as integers before injecting into CSS.
@@ -64,6 +67,7 @@ impl TransitionConfig {
         // let animation_delay: f32 = duration_per_image + transition_time;
         let animation_delay: f32 = duration_per_image;
         let duration_total: f32 = animation_delay * n_imgs;
+        let static_route = String::from("static");
         TransitionConfig {
             imgs,
             n_imgs,
@@ -72,6 +76,7 @@ impl TransitionConfig {
             transition_time,
             animation_delay,
             duration_total,
+            static_route,
         }
     }
     /// Return a vec of tuples, for declaring the keyframes of the CSS transition
@@ -102,7 +107,19 @@ impl TransitionConfig {
         // Load the Tera/Jinja template.
         let html_template = include_str!("../files/index.html.j2");
         let mut context = tera::Context::new();
+        let imgs: Vec<_> = self
+            .imgs
+            .iter()
+            .map(|i| {
+                format!(
+                    "{}/{}",
+                    self.static_route,
+                    i.file_name().unwrap_or_default().to_str().unwrap()
+                )
+            })
+            .collect();
         context.insert("config", &self);
+        context.insert("imgs", &imgs);
         context.insert("keyframes", &self.keyframes());
         Ok(tera::Tera::one_off(html_template, &context, false)?)
     }
@@ -114,10 +131,10 @@ mod tests {
     #[test]
     fn basic_math() {
         let mut imgs = Vec::new();
-        imgs.push("img/foo1.png".to_owned());
-        imgs.push("img/foo2.png".to_owned());
-        imgs.push("img/foo3.png".to_owned());
-        imgs.push("img/foo4.png".to_owned());
+        imgs.push(PathBuf::from("img/foo1.png"));
+        imgs.push(PathBuf::from("img/foo2.png"));
+        imgs.push(PathBuf::from("img/foo3.png"));
+        imgs.push(PathBuf::from("img/foo4.png"));
         let c = TransitionConfig::new(imgs, "foo".to_string());
         assert!(c.n_imgs == 4.0);
         assert!(c.animation_delay == 8.0);
@@ -132,7 +149,7 @@ mod tests {
     #[test]
     fn create_image_dir() {
         let d = String::from("img");
-        let i = ImageDir {
+        let _i = ImageDir {
             path: d.into(),
             file_extension: String::from("png"),
         };

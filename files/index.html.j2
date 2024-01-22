@@ -35,8 +35,8 @@ body {
 {% endfor %}
 }
 
-{% for i in config.imgs %}
-{% set n_imgs = config.imgs|length %}
+{% for i in imgs %}
+{% set n_imgs = imgs|length %}
 #f{{ loop.index }} {
     animation-delay: {{ config.animation_delay * (n_imgs - loop.index) }}s;
 }
@@ -46,7 +46,7 @@ body {
 
 <body>
 <div class="jawn fade">
-{% for i in config.imgs | reverse %}
+{% for i in imgs | reverse %}
     <img id="f{{ loop.index }}" src="{{ i }}">
 {% endfor %}
 </div>

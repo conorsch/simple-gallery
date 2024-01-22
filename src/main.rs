@@ -3,6 +3,7 @@ use clap::Parser;
 use simple_gallery::ImageDir;
 use simple_gallery::TransitionConfig;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use tower_http::services::ServeDir;
 use tower_http::services::ServeFile;
 
@@ -16,7 +17,7 @@ use env_logger::Env;
 struct Args {
     /// On-disk path for directory of images to serve
     #[clap(short, long, value_parser, default_value = "img")]
-    directory: String,
+    directory: PathBuf,
 
     /// Local TCP socket to bind to.
     #[clap(short, long, value_parser, default_value = "127.0.0.1:3000")]
@@ -46,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init_from_env(env);
 
     let i = ImageDir {
-        path: args.directory.parse()?,
+        path: args.directory.clone(),
         file_extension: args.file_extension,
     };
     let imgs = i.find_images();
@@ -55,7 +56,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Dump HTML and exit
     if args.generate {
-        debug!("Generating HTML, finding images in {}", &args.directory);
+        debug!(
+            "Generating HTML, finding images in {}",
+            &args.directory.display()
+        );
         println!("{}", html);
 
     // Otherwise, spin up webserver
@@ -66,7 +70,10 @@ async fn main() -> anyhow::Result<()> {
             // Homepage, auto slideshow from generated html
             .route("/", get(move || async { Html(html) }))
             // Static file server, so images can be loaded from directory
-            .nest_service("/img", ServeDir::new(&args.directory))
+            .nest_service(
+                format!("/{}", c.static_route).as_str(),
+                ServeDir::new(&args.directory),
+            )
             // Direct file loading of a random image from the directory
             .route_service("/random", RandomFileServer::new(i));
         debug!("Starting webserver, binding to {}", args.bind_address);
@@ -105,7 +112,7 @@ where
     fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
         // let r = get_random_image("img", "jpg");
         let r = self.0.get_random_image();
-        debug!("looked up fresh random image {} (in call)", r);
+        debug!("looked up fresh random image {} (in call)", r.display());
         let mut file_server = ServeFile::new(r);
         file_server.call(req)
     }
