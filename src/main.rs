@@ -6,6 +6,8 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use tower_http::services::ServeDir;
 use tower_http::services::ServeFile;
+use rand::thread_rng;
+use rand::seq::SliceRandom;
 
 #[macro_use]
 extern crate log;
@@ -16,28 +18,32 @@ use env_logger::Env;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// On-disk path for directory of images to serve
-    #[clap(short, long, value_parser, default_value = "img")]
+    #[clap(long, value_parser, default_value = "img")]
     directory: PathBuf,
 
     /// Local TCP socket to bind to.
-    #[clap(short, long, value_parser, default_value = "127.0.0.1:3000")]
+    #[clap(long, value_parser, default_value = "127.0.0.1:3000")]
     bind_address: SocketAddr,
 
     /// Title for HTML page, e.g. "example.com"
-    #[clap(short, long, value_parser, default_value = "simple-gallery")]
+    #[clap(long, value_parser, default_value = "simple-gallery")]
     title: String,
 
     /// Build static HTML and print to stdout, then exit
-    #[clap(short, long, value_parser, default_value_t = false)]
+    #[clap(long, value_parser, default_value_t = false)]
     generate: bool,
 
     /// Randomize order of images
-    #[clap(short, long, value_parser, default_value_t = true)]
+    #[clap(long, value_parser, default_value_t = true)]
     shuffle: bool,
 
     /// File extension of images, used to filter results.
-    #[clap(short, long, default_value = "png")]
+    #[clap(long, default_value = "png")]
     file_extension: String,
+
+    /// Duration in seconds for each image to be displayed, before switching to next image.
+    #[clap(long, default_value_t = 5)]
+    duration: usize,
 }
 
 #[tokio::main]
@@ -50,14 +56,26 @@ async fn main() -> anyhow::Result<()> {
         path: args.directory.clone(),
         file_extension: args.file_extension,
     };
-    let imgs = i.find_images();
-    let c = TransitionConfig::new(imgs, args.title);
+    let mut imgs = i.find_images();
+    let n_imgs = imgs.len();
+    if n_imgs == 0 {
+        warn!("found {} images in {}", n_imgs, &args.directory.display());
+    } else {
+        debug!("found {} images in {}", n_imgs, &args.directory.display());
+    }
+
+    if args.shuffle {
+        let mut rng = thread_rng();
+        imgs.shuffle(&mut rng);
+    }
+
+    let c = TransitionConfig::new(imgs, args.title, args.duration, args.shuffle);
     let html = c.generate_html()?;
 
     // Dump HTML and exit
     if args.generate {
         debug!(
-            "Generating HTML, finding images in {}",
+            "generating HTML, finding images in {}",
             &args.directory.display()
         );
         println!("{}", html);
@@ -76,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
             )
             // Direct file loading of a random image from the directory
             .route_service("/random", RandomFileServer::new(i));
-        debug!("Starting webserver, binding to {}", args.bind_address);
+        info!("starting webserver, binding to {}", args.bind_address);
         let listener = tokio::net::TcpListener::bind(args.bind_address).await?;
         axum::serve(listener, app.into_make_service()).await?;
     }

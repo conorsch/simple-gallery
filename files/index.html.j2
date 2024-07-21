@@ -1,54 +1,96 @@
+<!doctype html>
 <html>
 <head>
-<title>{{ config.title }}</title>
+  <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+  <title>{{ config.title }}</title>
 
-<style>
-
-body {
-  width: 100%;
-  height: 100%;
-  background-color: #222222;
-  display: block;
-  overflow: hidden;
-}
-.jawn img {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  opacity: 1;
-  visibility: hidden;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  <-- Each image should display for ~{{ config.duration_per_image }}s -->
-  animation: fade {{ config.duration_total }}s infinite;
-  -webkit-animation: fade {{ config.duration_total }}s infinite;
-}
-
-@keyframes fade {
-{% for kf in keyframes %}
-    {{ kf.0 }}% {
-        opacity: {{ kf.1 }};
-        visibility: visible;
+  <style>
+    body {
+      display: block;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      background-color: #222222;
+      overflow: hidden;
     }
-{% endfor %}
-}
+    .image-styled {
+      background-position: center;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-image: url("/random");
+      display: block;
+      transition: background 0.5s linear;
 
-{% for i in imgs %}
-{% set n_imgs = imgs|length %}
-#f{{ loop.index }} {
-    animation-delay: {{ config.animation_delay * (n_imgs - loop.index) }}s;
-}
-{% endfor %}
-</style>
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 1;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  </style>
 </head>
 
 <body>
-<div class="jawn fade">
-{% for i in imgs | reverse %}
-    <img id="f{{ loop.index }}" src="{{ i }}">
-{% endfor %}
-</div>
+  <div id="fadingImage" class="image-styled"></div>
+
+  <script>
+  // Overall JS image transition logic via https://daily-dev-tips.com/posts/fading-images-using-javascript/
+  // Notably the actual transition logic, e.g. fading, doesn't seem to work, but mechanically updating
+  // the image displayed every n seconds, as in a slideshow, does, which is good enough for now.
+  let images = [
+  {% for i in imgs | reverse %}
+    "{{ i }}",
+  {% endfor %}
+  ];
+  
+  // Only shuffle if the server-side opt is enabled.
+  if ({{ shuffle_opt }}) {
+      shuffle(images);
+  }
+
+  console.log("images is: ", images);
+
+  const imageEl = document.getElementById("fadingImage");
+  console.log("imageEl looks like", imageEl);
+
+  // Duration for each img, in milliseconds
+  let duration = {{ duration }} * 1000;
+  window.setInterval(changePicture, duration);
+
+  let i = 0;
+  changePicture();
+  function changePicture() {
+    i++;
+    if (i > images.length - 1) i = 0;
+    let img_url = `url("${images[i]}")`;
+    console.log("changing img to: ", img_url);
+    imageEl.style.backgroundImage = img_url;
+  }
+
+  // Function to randomize order of elements within an array.
+  // Takes ownership and modifies array in-place.
+  // via https://stackoverflow.com/questions/2450954/how-to-randomize-shuffle-a-javascript-array
+  function shuffle(array) {
+    let currentIndex = array.length;
+
+    // While there remain elements to shuffle...
+    while (currentIndex != 0) {
+
+      // Pick a remaining element...
+       let randomIndex = Math.floor(Math.random() * currentIndex);
+       currentIndex--;
+
+      // And swap it with the current element.
+      [array[currentIndex], array[randomIndex]] = [
+        array[randomIndex], array[currentIndex]];
+    }
+  }
+
+  </script>
+
 </body>
 </html>

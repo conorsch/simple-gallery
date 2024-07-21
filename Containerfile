@@ -1,4 +1,5 @@
 FROM rust AS builder
+LABEL maintainer=root@ruin.dev
 
 # use musl target for static binaries,
 # so we can use a scratch container.
@@ -26,6 +27,9 @@ COPY ./files ./files
 RUN rm -f ./target/release/deps/simple_gallery*
 RUN cargo build --release
 
-FROM scratch
+# technically we could use a "scratch" image here, so only the binary is present.
+# it's helpful to have a minimal OS, however, to debug e.g. volume mounts.
+# FROM scratch
+FROM debian:stable
 COPY --from=builder /simple-gallery/target/x86_64-unknown-linux-musl/release/simple-gallery /usr/bin/simple-gallery
 ENTRYPOINT ["/usr/bin/simple-gallery"]

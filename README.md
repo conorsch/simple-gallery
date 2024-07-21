@@ -2,7 +2,7 @@ simple-gallery
 ==============
 
 A portable webserver for creating extremely simple photo galleries,
-with **no Javascript.** It can serve directly, or just generate
+with **only vanilla JS.** It can serve directly, or just generate
 the raw HTML so you can serve up a static site elsewhere.
 
 Why?
@@ -10,8 +10,8 @@ Why?
 
 Sharing photos is hard. I don't want to create accounts on third-party
 websites riddled with ads. I'd like to self-host a few photos from an event,
-but wrangling open source Javascript frameworks is hard. Fortunately,
-static HTML and CSS is enough to get simple fade-in, fade-out transitions.
+but wrangling open source Javascript frameworks is hard. The experience I want is:
+dump a bunch of images into a directory, run a binary, and have a website.
 A simple script to generate static assets is enough for a decent-looking,
 barebones photo gallery website. You can see an example at https://jawn.best/.
 
@@ -21,8 +21,7 @@ All you need is a directory of images, preferably in PNG format. Then `simple-ga
 will:
 
 1. Scan the directory `--directory=img` for PNG files (specify e.g. `--file-extension jpg` to override)
-2. If `--generate` was given, print the HTML and exit.
-3. Otherwise, spin up a webserver on `127.0.0.1:3000` (specify `--bind-address`, `--port` to override)
+2. Otherwise, spin up a webserver on `127.0.0.1:3000` (specify `--bind-address`, `--port` to override)
 
 Installation
 ------------
@@ -81,7 +80,7 @@ Creating a static site
 With a directory structure like:
 
 ```
-img/
+cool-pictures/
 ├── tree.png
 ├── dog.png
 ├── horse.png
@@ -90,7 +89,7 @@ img/
 Run:
 
 ```
-simple-gallery --generate -d img > index.html
+simple-gallery --generate --directory ./cool-pictures > index.html
 ```
 
 You can now serve that directory, e.g.
@@ -110,6 +109,7 @@ References
 The logic for computing the CSS animation duration values were taken
 from this [invaluable blog post](https://www.devtwins.com/blog/css-cross-fading-images).
 As ever, [MDN CSS docs](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Animations/Using_CSS_animations) were helpful.
+The vanilla JS examples for transitions were adapted from [this helpful post](https://daily-dev-tips.com/posts/fading-images-using-javascript/).
 Finally, while it's not used, the crate [arse](https://crates.io/crates/arse) may be helpful.
 
 License
