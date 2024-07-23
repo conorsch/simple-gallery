@@ -1,5 +1,8 @@
 # simple-gallery changelog
 
+## 0.1.1
+* feat: support URL params for transition time, via `/?t=10`
+
 ## 0.1.0
 This release caves on the no-js policy, adding a wee bit of vanilla js
 to keep things sane. In the process, nice-to-haves like fade transitions

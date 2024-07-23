@@ -57,8 +57,15 @@
   const imageEl = document.getElementById("fadingImage");
   console.log("imageEl looks like", imageEl);
 
-  // Duration for each img, in milliseconds
-  let duration = {{ duration }} * 1000;
+  // Duration for each img, in seconds, as specified by server-side binary.
+  let server_duration = {{ duration }};
+  // We permit overriding this value via URL param, e.g. /?t=15.
+  let current_url = new URL(window.location.href);
+  let url_params = new URLSearchParams(current_url.search);
+  var duration = (url_params.get("t") || server_duration);
+  console.log("updating image every " + duration + " seconds");
+  // Convert from seconds to milliseconds.
+  duration = duration * 1000;
   window.setInterval(changePicture, duration);
 
   let i = 0;
